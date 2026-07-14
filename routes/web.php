@@ -6,9 +6,18 @@ Route::view('/', 'guest.home')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
-    Route::livewire('admin/basecolorguest', 'pages::admin.basecolorguest')->name('admin.basecolorguest');
-    Route::livewire('admin/site', 'pages::admin.site')->name('admin.site');
-    Route::livewire('admin/medsos', 'pages::admin.medsos')->name('admin.medsos');
+
+    Route::livewire('admin/basecolorguest', 'pages::admin.basecolorguest')
+        ->name('admin.basecolorguest');
+
+    Route::livewire('admin/site', 'pages::admin.site')
+        ->name('admin.site');
+
+    Route::livewire('admin/medsos', 'pages::admin.medsos')
+        ->name('admin.medsos');
+
+    Route::livewire('admin/skills', 'pages::admin.skills')
+        ->name('admin.skills');
 });
 
 Route::prefix('portfolio')->name('portfolio.')->group(function () {

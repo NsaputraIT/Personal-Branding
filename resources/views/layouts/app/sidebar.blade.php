@@ -12,14 +12,42 @@
 
             <flux:sidebar.nav>
                 <flux:sidebar.group :heading="__('Platform')" class="grid">
-                    <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
+                    <flux:sidebar.item
+                        icon="home"
+                        :href="route('dashboard')"
+                        :current="request()->routeIs('dashboard')"
+                        wire:navigate
+                    >
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="globe-alt" :href="route('admin.site')" :current="request()->routeIs('admin.site')" wire:navigate>
+
+                    <flux:sidebar.item
+                        icon="globe-alt"
+                        :href="route('admin.site')"
+                        :current="request()->routeIs('admin.site')"
+                        wire:navigate
+                    >
                         {{ __('Site') }}
                     </flux:sidebar.item>
-                    <flux:sidebar.item icon="link" :href="route('admin.medsos')" :current="request()->routeIs('admin.medsos')" wire:navigate>
+
+                    <flux:sidebar.item
+                        icon="link"
+                        :href="route('admin.medsos')"
+                        :current="request()->routeIs('admin.medsos')"
+                        wire:navigate
+                    >
                         {{ __('Medsos') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+
+                <flux:sidebar.group :heading="__('Content')" class="grid">
+                    <flux:sidebar.item
+                        icon="sparkles"
+                        :href="route('admin.skills')"
+                        :current="request()->routeIs('admin.skills')"
+                        wire:navigate
+                    >
+                        {{ __('Skills') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
