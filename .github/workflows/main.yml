@@ -1,0 +1,96 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 1. Buat file .env sementara di runner GitHub Actions
+    - name: Create .env file
+      run: |
+        echo "${{ secrets.ENV_PROD }}" > .env
+
+    # 2. Build Docker Image di runner
+    - name: Build Docker image
+      run: docker build -t righthorizone .
+
+    # 3. Save Docker image menjadi file .tar & Perbaiki Permission
+    - name: Save Docker image to tar file
+      run: |
+        docker save righthorizone -o righthorizone.tar
+        sudo chmod 644 righthorizone.tar
+
+    # 4. Copy file .tar dan .env ke VPS menggunakan SSH Key Auth
+    - name: Copy Files to VPS via SCP
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VPS_HOST_PROD }}
+        username: ${{ secrets.VPS_USER_PROD }}
+        key: ${{ secrets.VPS_SSH_KEY_PROD }}
+        port: 22
+        source: "righthorizone.tar,.env"
+        target: "/home"
+
+    # 5. Jalankan perintah SSH di VPS menggunakan SSH Key Auth
+    - name: Execute Remote SSH Commands
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VPS_HOST_PROD }}
+        username: ${{ secrets.VPS_USER_PROD }}
+        key: ${{ secrets.VPS_SSH_KEY_PROD }}
+        port: 22
+        script: |
+          set -e
+          HOME_DIR="/home"
+          ENV_DIR="$HOME_DIR/app-environments"
+
+          # 1. Buat folder khusus env jika belum ada
+          mkdir -p $ENV_DIR
+
+          # 2. Pindahkan file .env yang baru dikirim ke folder khusus dengan nama unik proyek
+          mv $HOME_DIR/.env $ENV_DIR/righthorizone.env
+
+          # 3. Amankan permission folder dan file env agar hanya bisa diakses user ini
+          chmod 700 $ENV_DIR
+          chmod 600 $ENV_DIR/righthorizone.env
+
+          # 4. Pastikan network docker sudah ada
+          docker network create langs-network || true
+
+          # 5. Stop and remove existing container if it exists
+          if [ "$(docker ps -q -f name=righthorizone)" ]; then
+            docker stop righthorizone
+          fi
+          if [ "$(docker ps -aq -f status=exited -f name=righthorizone)" ]; then
+            docker rm righthorizone
+          fi
+
+          # 6. Remove existing image if it exists
+          if [ "$(docker images -q righthorizone)" ]; then
+            docker rmi righthorizone
+          fi
+
+          # 7. Load new Docker image
+          docker load -i $HOME_DIR/righthorizone.tar
+
+          # 8. Run new container dengan merujuk ke folder khusus env baru
+          docker run -d \
+            --name righthorizone \
+            --network langs-network \
+            --memory="128m" \
+            --memory-swap="128m" \
+            --cpus="0.1" \
+            --env-file $ENV_DIR/righthorizone.env \
+            --restart unless-stopped \
+            righthorizone
+
+          # 9. Cleanup file .tar yang sudah tidak digunakan
+          rm -f $HOME_DIR/righthorizone.tar
