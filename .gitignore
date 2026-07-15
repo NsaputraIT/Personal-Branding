@@ -24,3 +24,5 @@ yarn-error.log
 /.zed
 /.kiro
 /.claude
+CLAUDE.md
+AGENTS.md
