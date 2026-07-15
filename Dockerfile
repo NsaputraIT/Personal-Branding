@@ -1,5 +1,31 @@
 # ==========================================
-# STAGE 1: Build Frontend Assets (Vite)
+# STAGE 1: Install Composer Dependencies
+# ==========================================
+FROM dunglas/frankenphp:1-php8.3-alpine AS vendor-builder
+
+WORKDIR /app
+
+# Install ekstensi PHP yang dibutuhkan
+RUN apk add --no-cache \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    icu-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql zip gd intl pcntl
+
+# Install Composer resmi
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Salin seluruh source code
+COPY . .
+
+# Install dependensi Laravel (tanpa dev-dependencies)
+RUN composer install --no-interaction --optimize-autoloader --no-dev
+
+# ==========================================
+# STAGE 2: Build Frontend Assets (Vite)
 # ==========================================
 FROM node:20-alpine AS asset-builder
 
@@ -11,6 +37,9 @@ COPY package*.json ./
 # Install SEMUA dependensi termasuk Vite
 RUN npm ci
 
+# Copy vendor dari vendor-builder agar flux.css bisa diresolusi oleh Vite/Tailwind
+COPY --from=vendor-builder /app/vendor ./vendor
+
 # Salin sisa file yang dibutuhkan untuk build (resources, vite.config.js, dll)
 COPY . .
 
@@ -18,7 +47,7 @@ COPY . .
 RUN npm run build
 
 # ==========================================
-# STAGE 2: Production Image (FrankenPHP)
+# STAGE 3: Production Image (FrankenPHP)
 # ==========================================
 FROM dunglas/frankenphp:1-php8.3-alpine
 
@@ -37,23 +66,26 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
-# Copy seluruh source code Laravel dari host
+# Salin seluruh source code Laravel dari host
 COPY . .
 
-# AMBIL HASIL BUILD DARI STAGE 1 (Menimpa folder public/build dengan versi terkompilasi)
+# Salin vendor dari vendor-builder (sudah dioptimasi)
+COPY --from=vendor-builder /app/vendor ./vendor
+
+# AMBIL HASIL BUILD DARI STAGE 2 (Menimpa folder public/build dengan versi terkompilasi)
 COPY --from=asset-builder /app/public/build ./public/build
 
 # Bersihkan file development/repository yang tidak dibutuhkan di production
 RUN rm -rf .git .github README.md CONTRIBUTING.md .claude PRD.md .vscode .dockerignore Dockerfile node_modules
 
-# Install dependensi Laravel (tanpa dev-dependencies)
-RUN composer install --no-interaction --optimize-autoloader --no-dev
+# Optimasi autoload setelah vendor dicopy
+RUN composer dump-autoload --optimize
 
 # Atur izin folder agar FrankenPHP bisa menulis cache & log
 RUN chown -R root:www-data /app/storage /app/bootstrap/cache \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
-# Copy custom Caddyfile (non-HTTPS untuk internal/dev)
+# Copy custom Caddyfile
 COPY Caddyfile /etc/caddy/Caddyfile
 
 # Expose port HTTP default FrankenPHP

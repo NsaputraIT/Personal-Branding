@@ -1,0 +1,9 @@
+node_modules
+vendor
+.git
+.github
+.env
+.vscode
+.idea
+*.md
+.claude
