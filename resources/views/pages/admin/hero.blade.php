@@ -4,8 +4,12 @@ use App\Models\HeroSection;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 
 new #[Title('Hero Section')] class extends Component {
+    use WithFileUploads;
+
     public string $heading = '';
     public string $subheading = '';
     public string $ctaPrimaryText = '';
@@ -13,6 +17,7 @@ new #[Title('Hero Section')] class extends Component {
     public string $ctaSecondaryText = '';
     public string $ctaSecondaryUrl = '';
     public string $profileImage = '';
+    public $profileImageFile = null;
     public array $stats = [];
 
     public function mount(): void
@@ -39,6 +44,11 @@ new #[Title('Hero Section')] class extends Component {
         $this->stats = array_values($this->stats);
     }
 
+    public function removeImage(): void
+    {
+        $this->profileImageFile = null;
+    }
+
     public function save(): void
     {
         $this->validate([
@@ -49,8 +59,19 @@ new #[Title('Hero Section')] class extends Component {
             'ctaSecondaryText' => ['nullable', 'string', 'max:255'],
             'ctaSecondaryUrl' => ['nullable', 'string', 'max:255'],
             'profileImage' => ['nullable', 'string', 'max:255'],
+            'profileImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'stats' => ['nullable', 'array'],
         ]);
+
+        if ($this->profileImageFile) {
+            $path = $this->profileImageFile->store('hero', 'public');
+
+            if ($this->profileImage) {
+                Storage::disk('public')->delete($this->profileImage);
+            }
+
+            $this->profileImage = $path;
+        }
 
         HeroSection::firstOrFail()->update([
             'heading' => $this->heading,
@@ -62,6 +83,8 @@ new #[Title('Hero Section')] class extends Component {
             'profile_image' => $this->profileImage,
             'stats' => $this->stats,
         ]);
+
+        $this->profileImageFile = null;
 
         Flux::toast(
             heading: 'Hero section saved',
@@ -124,12 +147,56 @@ new #[Title('Hero Section')] class extends Component {
 
         <div>
             <flux:heading level="3" size="lg">{{ __('Profile Image') }}</flux:heading>
-            <flux:text class="mt-1 mb-4">{{ __('Path to the hero profile image.') }}</flux:text>
+            <flux:text class="mt-1 mb-4">{{ __('Upload a profile image for the hero section.') }}</flux:text>
 
-            <flux:field>
-                <flux:label>{{ __('Image Path') }}</flux:label>
-                <flux:input wire:model="profileImage" type="text" />
-            </flux:field>
+            <div class="flex items-center gap-6">
+                <div class="shrink-0">
+                    @if ($profileImageFile)
+                        <img src="{{ $profileImageFile->temporaryUrl() }}" class="h-32 w-32 rounded-full object-cover" alt="{{ __('Preview') }}">
+                    @elseif ($profileImage)
+                        <img src="{{ Storage::url($profileImage) }}" class="h-32 w-32 rounded-full object-cover" alt="{{ __('Current profile image') }}">
+                    @else
+                        <div class="flex h-32 w-32 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
+                            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <input
+                        type="file"
+                        wire:model="profileImageFile"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        class="hidden"
+                        x-ref="profileImageInput"
+                    />
+
+                    <div class="flex items-center gap-2">
+                        <flux:button type="button" variant="primary" x-on:click="$refs.profileImageInput.click()">
+                            {{ __('Upload Image') }}
+                        </flux:button>
+
+                        @if ($profileImageFile)
+                            <flux:button type="button" variant="ghost" wire:click="removeImage" wire:loading.attr="disabled">
+                                {{ __('Remove Image') }}
+                            </flux:button>
+                        @endif
+                    </div>
+
+                    <div class="flex items-center gap-2 text-sm text-zinc-500">
+                        @if ($profileImageFile)
+                            <span>{{ $profileImageFile->getClientOriginalName() }}</span>
+                        @elseif ($profileImage)
+                            <span>{{ __('Current image loaded') }}</span>
+                        @else
+                            <span>{{ __('No file selected') }}</span>
+                        @endif
+                        <span wire:loading wire:target="profileImageFile">{{ __('Uploading...') }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div>
