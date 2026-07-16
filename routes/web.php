@@ -16,8 +16,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('admin/medsos', 'pages::admin.medsos')
         ->name('admin.medsos');
 
-    Route::livewire('admin/skills', 'pages::admin.skills')
-        ->name('admin.skills');
+    // Skills moved into About page
+    Route::redirect('admin/skills', 'admin/about')->name('admin.skills');
+
+    Route::livewire('admin/hero', 'pages::admin.hero')
+        ->name('admin.hero');
+
+    Route::livewire('admin/about', 'pages::admin.about')
+        ->name('admin.about');
+
+    Route::livewire('admin/contact', 'pages::admin.contact')
+        ->name('admin.contact');
+
+    Route::livewire('admin/footer', 'pages::admin.footer')
+        ->name('admin.footer');
+
+    Route::livewire('admin/services', 'pages::admin.services')
+        ->name('admin.services');
+
+    Route::livewire('admin/portfolio', 'pages::admin.portfolio')
+        ->name('admin.portfolio');
+
+    Route::livewire('admin/testimonials', 'pages::admin.testimonials')
+        ->name('admin.testimonials');
+
+    Route::livewire('admin/faq', 'pages::admin.faq')
+        ->name('admin.faq');
+
+    Route::livewire('admin/resume', 'pages::admin.resume')
+        ->name('admin.resume');
 });
 
 Route::prefix('portfolio')->name('portfolio.')->group(function () {

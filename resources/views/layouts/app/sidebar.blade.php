@@ -42,12 +42,84 @@
 
                 <flux:sidebar.group :heading="__('Content')" class="grid">
                     <flux:sidebar.item
-                        icon="sparkles"
-                        :href="route('admin.skills')"
-                        :current="request()->routeIs('admin.skills')"
+                        icon="user"
+                        :href="route('admin.hero')"
+                        :current="request()->routeIs('admin.hero')"
                         wire:navigate
                     >
-                        {{ __('Skills') }}
+                        {{ __('Hero') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="identification"
+                        :href="route('admin.about')"
+                        :current="request()->routeIs('admin.about')"
+                        wire:navigate
+                    >
+                        {{ __('About') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="document-text"
+                        :href="route('admin.resume')"
+                        :current="request()->routeIs('admin.resume')"
+                        wire:navigate
+                    >
+                        {{ __('Resume') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="folder"
+                        :href="route('admin.portfolio')"
+                        :current="request()->routeIs('admin.portfolio')"
+                        wire:navigate
+                    >
+                        {{ __('Portfolio') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="wrench"
+                        :href="route('admin.services')"
+                        :current="request()->routeIs('admin.services')"
+                        wire:navigate
+                    >
+                        {{ __('Services') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="chat-bubble-left"
+                        :href="route('admin.testimonials')"
+                        :current="request()->routeIs('admin.testimonials')"
+                        wire:navigate
+                    >
+                        {{ __('Testimonials') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="question-mark-circle"
+                        :href="route('admin.faq')"
+                        :current="request()->routeIs('admin.faq')"
+                        wire:navigate
+                    >
+                        {{ __('FAQ') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="envelope"
+                        :href="route('admin.contact')"
+                        :current="request()->routeIs('admin.contact')"
+                        wire:navigate
+                    >
+                        {{ __('Contact') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="rectangle-group"
+                        :href="route('admin.footer')"
+                        :current="request()->routeIs('admin.footer')"
+                        wire:navigate
+                    >
+                        {{ __('Footer') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>

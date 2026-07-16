@@ -1,13 +1,20 @@
+@php
+    $testimonials = \App\Models\Testimonial::where('is_active', true)->orderBy('sort_order')->get();
+    $site = \App\Models\Site::first();
+    $meta = $site?->section_metadata;
+    $sectionData = $meta['testimonials'] ?? [];
+@endphp
+
 <section id="testimonials" class="testimonials section light-background">
 
       <div class="container section-title" data-aos="fade-up">
-        <h2>Testimonials</h2>
+        <h2>{{ $sectionData['title'] ?? 'Testimonials' }}</h2>
         <div class="title-shape">
           <svg viewBox="0 0 200 20" xmlns="http://www.w3.org/2000/svg">
             <path d="M 0,10 C 40,0 60,20 100,10 C 140,0 160,20 200,10" fill="none" stroke="currentColor" stroke-width="2"></path>
           </svg>
         </div>
-        <p>Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur vel illum qui dolorem</p>
+        <p>{{ $sectionData['description'] ?? 'Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur vel illum qui dolorem' }}</p>
       </div>
 
       <div class="container" data-aos="fade-up" data-aos-delay="100">
@@ -30,119 +37,37 @@
 
           <div class="swiper-wrapper">
 
+            @foreach($testimonials as $testimonial)
             <div class="swiper-slide">
               <div class="testimonial-item">
                 <div class="row">
                   <div class="col-lg-8">
-                    <h2>Sed ut perspiciatis unde omnis</h2>
+                    <h2>{{ $testimonial->title }}</h2>
                     <p>
-                      Proin iaculis purus consequat sem cure digni ssim donec porttitora entum suscipit rhoncus. Accusantium quam, ultricies eget id, aliquam eget nibh et. Maecen aliquam, risus at semper.
+                      {{ $testimonial->quote }}
                     </p>
+                    @if($testimonial->quote_extra)
                     <p>
-                      Beatae magnam dolore quia ipsum. Voluptatem totam et qui dolore dignissimos. Amet quia sapiente laudantium nihil illo et assumenda sit cupiditate. Nam perspiciatis perferendis minus consequatur. Enim ut eos quo.
+                      {{ $testimonial->quote_extra }}
                     </p>
+                    @endif
                     <div class="profile d-flex align-items-center">
-                      <img src="{{ asset('asset/img/person/person-m-7.webp') }}" class="profile-img" alt="">
+                      <img src="{{ asset($testimonial->avatar ?? 'asset/img/person/person-m-7.webp') }}" class="profile-img" alt="">
                       <div class="profile-info">
-                        <h3>Saul Goodman</h3>
-                        <span>Client</span>
+                        <h3>{{ $testimonial->name }}</h3>
+                        <span>{{ $testimonial->role }}</span>
                       </div>
                     </div>
                   </div>
                   <div class="col-lg-4 d-none d-lg-block">
                     <div class="featured-img-wrapper">
-                      <img src="{{ asset('asset/img/person/person-m-7.webp') }}" class="featured-img" alt="">
+                      <img src="{{ asset($testimonial->avatar ?? 'asset/img/person/person-m-7.webp') }}" class="featured-img" alt="">
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-
-            <div class="swiper-slide">
-              <div class="testimonial-item">
-                <div class="row">
-                  <div class="col-lg-8">
-                    <h2>Nemo enim ipsam voluptatem</h2>
-                    <p>
-                      Export tempor illum tamen malis malis eram quae irure esse labore quem cillum quid cillum eram malis quorum velit fore eram velit sunt aliqua noster fugiat irure amet legam anim culpa.
-                    </p>
-                    <p>
-                      Dolorem excepturi esse qui amet maxime quibusdam aut repellendus voluptatum. Corrupti enim a repellat cumque est laborum fuga consequuntur. Dolorem nostrum deleniti quas voluptatem iure dolorum rerum. Repudiandae doloribus ut repellat harum vero aut. Modi aut velit aperiam aspernatur odit ut vitae.
-                    </p>
-                    <div class="profile d-flex align-items-center">
-                      <img src="{{ asset('asset/img/person/person-f-8.webp') }}" class="profile-img" alt="">
-                      <div class="profile-info">
-                        <h3>Sara Wilsson</h3>
-                        <span>Designer</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-lg-4 d-none d-lg-block">
-                    <div class="featured-img-wrapper">
-                      <img src="{{ asset('asset/img/person/person-f-8.webp') }}" class="featured-img" alt="">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="swiper-slide">
-              <div class="testimonial-item">
-                <div class="row">
-                  <div class="col-lg-8">
-                    <h2>
-                      Labore nostrum eos impedit
-                    </h2>
-                    <p>
-                      Fugiat enim eram quae cillum dolore dolor amet nulla culpa multos export minim fugiat minim velit minim dolor enim duis veniam ipsum anim magna sunt elit fore quem dolore labore illum veniam.
-                    </p>
-                    <p>
-                      Itaque ut explicabo vero occaecati est quam rerum sed. Numquam tempora aut aut quaerat quia illum. Nobis quia autem odit ipsam numquam. Doloribus sit sint corporis eius totam fuga. Hic nostrum suscipit corrupti nam expedita adipisci aut optio.
-                    </p>
-                    <div class="profile d-flex align-items-center">
-                      <img src="{{ asset('asset/img/person/person-m-9.webp') }}" class="profile-img" alt="">
-                      <div class="profile-info">
-                        <h3>Matt Brandon</h3>
-                        <span>Freelancer</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-lg-4 d-none d-lg-block">
-                    <div class="featured-img-wrapper">
-                      <img src="{{ asset('asset/img/person/person-m-9.webp') }}" class="featured-img" alt="">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="swiper-slide">
-              <div class="testimonial-item">
-                <div class="row">
-                  <div class="col-lg-8">
-                    <h2>Impedit dolor facilis nulla</h2>
-                    <p>
-                      Enim nisi quem export duis labore cillum quae magna enim sint quorum nulla quem veniam duis minim tempor labore quem eram duis noster aute amet eram fore quis sint minim.
-                    </p>
-                    <p>
-                      Omnis aspernatur accusantium qui delectus praesentium repellendus. Facilis sint odio aspernatur voluptas commodi qui qui qui pariatur. Corrupti deleniti itaque quaerat ipsum deleniti culpa tempora tempore. Et consequatur exercitationem hic aspernatur nobis est voluptatibus architecto laborum.
-                    </p>
-                    <div class="profile d-flex align-items-center">
-                      <img src="{{ asset('asset/img/person/person-f-10.webp') }}" class="profile-img" alt="">
-                      <div class="profile-info">
-                        <h3>Jena Karlis</h3>
-                        <span>Store Owner</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="col-lg-4 d-none d-lg-block">
-                    <div class="featured-img-wrapper">
-                      <img src="{{ asset('asset/img/person/person-f-10.webp') }}" class="featured-img" alt="">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            @endforeach
 
           </div>
 

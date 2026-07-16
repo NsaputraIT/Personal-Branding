@@ -61,7 +61,7 @@
                 CMS Modules
             </h2>
 
-            <div class="mt-6 grid gap-4 md:grid-cols-3">
+            <div class="mt-6 grid gap-4 md:grid-cols-4">
 
                 <a href="{{ route('admin.site') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
                     Site
@@ -71,8 +71,40 @@
                     Social Media
                 </a>
 
-                <a href="{{ route('admin.skills') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
-                    Skills
+                <a href="{{ route('admin.hero') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Hero
+                </a>
+
+                <a href="{{ route('admin.about') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    About
+                </a>
+
+                <a href="{{ route('admin.resume') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Resume
+                </a>
+
+                <a href="{{ route('admin.portfolio') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Portfolio
+                </a>
+
+                <a href="{{ route('admin.services') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Services
+                </a>
+
+                <a href="{{ route('admin.testimonials') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Testimonials
+                </a>
+
+                <a href="{{ route('admin.faq') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    FAQ
+                </a>
+
+                <a href="{{ route('admin.contact') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Contact
+                </a>
+
+                <a href="{{ route('admin.footer') }}" class="rounded-lg border p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+                    Footer
                 </a>
 
             </div>

@@ -18,6 +18,7 @@ new #[Title('Skills settings')] class extends Component {
     public ?int $editSkillId = null;
     public ?int $deleteSkillId = null;
     public string $name = '';
+    public string $description = '';
     public int $percentage = 0;
     public int $sortOrder = 0;
     public bool $isActive = true;
@@ -45,6 +46,7 @@ new #[Title('Skills settings')] class extends Component {
     {
         $this->editSkillId = null;
         $this->name = '';
+        $this->description = '';
         $this->percentage = 0;
         $this->sortOrder = 0;
         $this->isActive = true;
@@ -59,6 +61,7 @@ new #[Title('Skills settings')] class extends Component {
     {
         $this->validate([
             'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:65535'],
             'percentage' => ['required', 'integer', 'min:0', 'max:100'],
             'sortOrder' => ['required', 'integer', 'min:0'],
             'isActive' => ['boolean'],
@@ -71,6 +74,7 @@ new #[Title('Skills settings')] class extends Component {
 
             $skill->update([
                 'name' => $this->name,
+                'description' => $this->description,
                 'percentage' => $this->percentage,
                 'sort_order' => $this->sortOrder,
                 'is_active' => $this->isActive,
@@ -80,6 +84,7 @@ new #[Title('Skills settings')] class extends Component {
 
             Skill::create([
                 'name' => $this->name,
+                'description' => $this->description,
                 'percentage' => $this->percentage,
                 'sort_order' => $this->sortOrder,
                 'is_active' => $this->isActive,
@@ -111,6 +116,7 @@ new #[Title('Skills settings')] class extends Component {
     {
         $this->editSkillId = null;
         $this->name = '';
+        $this->description = '';
         $this->percentage = 0;
         $this->sortOrder = 0;
         $this->isActive = true;
@@ -125,6 +131,7 @@ new #[Title('Skills settings')] class extends Component {
 
         $this->editSkillId = $skill->id;
         $this->name = $skill->name;
+        $this->description = $skill->description ?? '';
         $this->percentage = $skill->percentage;
         $this->sortOrder = $skill->sort_order;
         $this->isActive = $skill->is_active;
@@ -350,6 +357,19 @@ new #[Title('Skills settings')] class extends Component {
                 <flux:input
                     wire:model="name"
                     type="text"
+                />
+
+            </flux:field>
+
+            <flux:field>
+
+                <flux:label>
+                    {{ __('Description') }}
+                </flux:label>
+
+                <flux:textarea
+                    wire:model="description"
+                    rows="2"
                 />
 
             </flux:field>
