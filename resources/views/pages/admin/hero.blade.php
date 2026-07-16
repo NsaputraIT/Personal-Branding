@@ -70,7 +70,7 @@ new #[Title('Hero Section')] class extends Component {
                 Storage::disk('public')->delete($this->profileImage);
             }
 
-            $this->profileImage = $path;
+            $this->profileImage = url('/').'/storage/'.$path;
         }
 
         HeroSection::firstOrFail()->update([
