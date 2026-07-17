@@ -31,6 +31,24 @@ new #[Title('Hero Section')] class extends Component {
         $this->ctaSecondaryUrl = $hero->cta_secondary_url ?? '';
         $this->profileImage = $hero->profile_image ?? '';
         $this->stats = $hero->stats ?? [];
+
+        // Backward compatibility: convert legacy full URLs to relative paths
+        if ($this->profileImage
+            && (str_starts_with($this->profileImage, 'http://')
+                || str_starts_with($this->profileImage, 'https://'))
+        ) {
+            $parsedPath = parse_url($this->profileImage, PHP_URL_PATH);
+            $prefix = '/storage/';
+
+            if ($parsedPath && str_starts_with($parsedPath, $prefix)) {
+                $relative = ltrim(substr($parsedPath, strlen($prefix)), '/');
+
+                if ($relative) {
+                    HeroSection::firstOrFail()->update(['profile_image' => $relative]);
+                    $this->profileImage = $relative;
+                }
+            }
+        }
     }
 
     public function addStat(): void
@@ -70,7 +88,7 @@ new #[Title('Hero Section')] class extends Component {
                 Storage::disk('public')->delete($this->profileImage);
             }
 
-            $this->profileImage = url('/').'/storage/'.$path;
+            $this->profileImage = $path;
         }
 
         HeroSection::firstOrFail()->update([
@@ -151,17 +169,15 @@ new #[Title('Hero Section')] class extends Component {
 
             <div class="flex items-center gap-6">
                 <div class="shrink-0">
-                    @if ($profileImageFile)
-                        <img src="{{ $profileImageFile->temporaryUrl() }}" class="h-32 w-32 rounded-full object-cover" alt="{{ __('Preview') }}">
-                    @elseif ($profileImage)
-                        <img src="{{ Storage::url($profileImage) }}" class="h-32 w-32 rounded-full object-cover" alt="{{ __('Current profile image') }}">
-                    @else
-                        <div class="flex h-32 w-32 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
-                            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                        </div>
-                    @endif
+                    <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
+                        @if ($profileImageFile)
+                            <img src="{{ $profileImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
+                        @elseif ($profileImage)
+                            <img src="{{ Storage::url($profileImage) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current profile image') }}">
+                        @else
+                            <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
+                        @endif
+                    </div>
                 </div>
 
                 <div class="flex flex-col gap-2">

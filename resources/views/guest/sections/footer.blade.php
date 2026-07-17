@@ -12,7 +12,7 @@
       </div>
       <div class="social-links d-flex justify-content-center">
         @foreach($socialMedia as $social)
-        <a href="{{ $social->url ?? '#' }}"><i class="bi {{ $social->icon ?? 'bi-twitter-x' }}"></i></a>
+        <a href="{{ $social->medsos_url ?? '#' }}"><i class="bi {{ $social->medsos_icon ?? 'bi-twitter-x' }}"></i></a>
         @endforeach
       </div>
       <div class="credits">

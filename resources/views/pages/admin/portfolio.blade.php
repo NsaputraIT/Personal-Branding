@@ -5,8 +5,12 @@ use App\Models\Site;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 
 new #[Title('Portfolio')] class extends Component {
+    use WithFileUploads;
+
     public array $items = [];
     public string $sectionTitle = '';
     public string $sectionDescription = '';
@@ -18,6 +22,7 @@ new #[Title('Portfolio')] class extends Component {
     public string $title = '';
     public string $description = '';
     public string $imagePath = '';
+    public $imageFile = null;
     public string $detailUrl = '';
     public int $sortOrder = 0;
     public bool $isActive = true;
@@ -65,10 +70,16 @@ new #[Title('Portfolio')] class extends Component {
         $this->title = '';
         $this->description = '';
         $this->imagePath = '';
+        $this->imageFile = null;
         $this->detailUrl = '';
         $this->sortOrder = 0;
         $this->isActive = true;
         $this->dispatch('modal-show', name: 'portfolio-form');
+    }
+
+    public function removeImage(): void
+    {
+        $this->imageFile = null;
     }
 
     public function save(): void
@@ -77,32 +88,37 @@ new #[Title('Portfolio')] class extends Component {
             'category' => ['required', 'string', 'max:100'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'imagePath' => ['required', 'string', 'max:255'],
+            'imagePath' => ['required_without:imageFile', 'string', 'max:255'],
+            'imageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'detailUrl' => ['nullable', 'string', 'max:255'],
             'sortOrder' => ['required', 'integer', 'min:0'],
             'isActive' => ['boolean'],
         ]);
 
+        if ($this->imageFile) {
+            $path = $this->imageFile->store('portfolio', 'public');
+
+            if ($this->editId && $this->imagePath && !str_contains($this->imagePath, '..')) {
+                Storage::disk('public')->delete($this->imagePath);
+            }
+
+            $this->imagePath = $path;
+        }
+
+        $data = [
+            'category' => $this->category,
+            'title' => $this->title,
+            'description' => $this->description,
+            'image_path' => $this->imagePath,
+            'detail_url' => $this->detailUrl,
+            'sort_order' => $this->sortOrder,
+            'is_active' => $this->isActive,
+        ];
+
         if ($this->editId) {
-            PortfolioItem::findOrFail($this->editId)->update([
-                'category' => $this->category,
-                'title' => $this->title,
-                'description' => $this->description,
-                'image_path' => $this->imagePath,
-                'detail_url' => $this->detailUrl,
-                'sort_order' => $this->sortOrder,
-                'is_active' => $this->isActive,
-            ]);
+            PortfolioItem::findOrFail($this->editId)->update($data);
         } else {
-            PortfolioItem::create([
-                'category' => $this->category,
-                'title' => $this->title,
-                'description' => $this->description,
-                'image_path' => $this->imagePath,
-                'detail_url' => $this->detailUrl,
-                'sort_order' => $this->sortOrder,
-                'is_active' => $this->isActive,
-            ]);
+            PortfolioItem::create($data);
         }
 
         $this->loadItems();
@@ -122,6 +138,7 @@ new #[Title('Portfolio')] class extends Component {
         $this->title = '';
         $this->description = '';
         $this->imagePath = '';
+        $this->imageFile = null;
         $this->detailUrl = '';
         $this->sortOrder = 0;
         $this->isActive = true;
@@ -138,6 +155,25 @@ new #[Title('Portfolio')] class extends Component {
         $this->detailUrl = $item->detail_url ?? '';
         $this->sortOrder = $item->sort_order;
         $this->isActive = $item->is_active;
+
+        // Backward compatibility: convert legacy full URLs to relative paths
+        if ($this->imagePath
+            && (str_starts_with($this->imagePath, 'http://')
+                || str_starts_with($this->imagePath, 'https://'))
+        ) {
+            $parsedPath = parse_url($this->imagePath, PHP_URL_PATH);
+            $prefix = '/storage/';
+
+            if ($parsedPath && str_starts_with($parsedPath, $prefix)) {
+                $relative = ltrim(substr($parsedPath, strlen($prefix)), '/');
+
+                if ($relative) {
+                    $item->update(['image_path' => $relative]);
+                    $this->imagePath = $relative;
+                }
+            }
+        }
+
         Flux::modal('portfolio-form')->show();
     }
 
@@ -150,7 +186,15 @@ new #[Title('Portfolio')] class extends Component {
     public function delete(): void
     {
         if (!$this->deleteId) return;
-        PortfolioItem::findOrFail($this->deleteId)->delete();
+
+        $item = PortfolioItem::findOrFail($this->deleteId);
+
+        // Delete associated image
+        if ($item->image_path && !str_contains($item->image_path, '..')) {
+            Storage::disk('public')->delete($item->image_path);
+        }
+
+        $item->delete();
         $this->loadItems();
         $this->deleteId = null;
         Flux::modal('delete-portfolio-confirm')->close();
@@ -270,10 +314,59 @@ new #[Title('Portfolio')] class extends Component {
                 <flux:label>{{ __('Description') }}</flux:label>
                 <flux:textarea wire:model="description" rows="3" />
             </flux:field>
-            <flux:field>
-                <flux:label>{{ __('Image Path') }}</flux:label>
-                <flux:input wire:model="imagePath" type="text" placeholder="asset/img/portfolio/portfolio-1.webp" />
-            </flux:field>
+
+            <div>
+                <flux:label>{{ __('Image') }}</flux:label>
+                <flux:text class="mt-1 mb-4">{{ __('Upload an image or enter a path.') }}</flux:text>
+
+                <div class="flex items-center gap-6">
+                    <div class="shrink-0">
+                        <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
+                            @if ($imageFile)
+                                <img src="{{ $imageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
+                            @elseif ($imagePath && !str_starts_with($imagePath, 'asset/'))
+                                <img src="{{ Storage::url($imagePath) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current image') }}">
+                            @else
+                                <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <input
+                            type="file"
+                            wire:model="imageFile"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            class="hidden"
+                            x-ref="imageInput"
+                        />
+
+                        <div class="flex items-center gap-2">
+                            <flux:button type="button" variant="primary" x-on:click="$refs.imageInput.click()">
+                                {{ __('Upload Image') }}
+                            </flux:button>
+
+                            @if ($imageFile)
+                                <flux:button type="button" variant="ghost" wire:click="removeImage" wire:loading.attr="disabled">
+                                    {{ __('Remove Image') }}
+                                </flux:button>
+                            @endif
+                        </div>
+
+                        <div class="flex items-center gap-2 text-sm text-zinc-500">
+                            @if ($imageFile)
+                                <span>{{ $imageFile->getClientOriginalName() }}</span>
+                            @elseif ($imagePath)
+                                <span>{{ __('Current image loaded') }}</span>
+                            @else
+                                <span>{{ __('No file selected') }}</span>
+                            @endif
+                            <span wire:loading wire:target="imageFile">{{ __('Uploading...') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <flux:field>
                 <flux:label>{{ __('Detail URL (optional)') }}</flux:label>
                 <flux:input wire:model="detailUrl" type="text" />

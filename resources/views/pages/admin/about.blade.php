@@ -5,8 +5,12 @@ use App\Models\Skill;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 
 new #[Title('About')] class extends Component {
+    use WithFileUploads;
+
     // --- About section fields ---
     public string $heading = '';
     public string $description = '';
@@ -14,7 +18,9 @@ new #[Title('About')] class extends Component {
     public string $paragraph1 = '';
     public string $paragraph2 = '';
     public string $profileImage = '';
+    public $profileImageFile = null;
     public string $signatureImage = '';
+    public $signatureImageFile = null;
     public string $signatureName = '';
     public string $signatureTitle = '';
     public array $infoItems = [];
@@ -43,6 +49,27 @@ new #[Title('About')] class extends Component {
         $this->signatureTitle = $about->signature_title ?? '';
         $this->infoItems = $about->info_items ?? [];
 
+        // Backward compatibility: convert legacy full URLs to relative paths
+        foreach (['profileImage' => 'profile_image', 'signatureImage' => 'signature_image'] as $prop => $column) {
+            $value = $this->{$prop};
+            if ($value
+                && (str_starts_with($value, 'http://')
+                    || str_starts_with($value, 'https://'))
+            ) {
+                $parsedPath = parse_url($value, PHP_URL_PATH);
+                $prefix = '/storage/';
+
+                if ($parsedPath && str_starts_with($parsedPath, $prefix)) {
+                    $relative = ltrim(substr($parsedPath, strlen($prefix)), '/');
+
+                    if ($relative) {
+                        AboutSection::firstOrFail()->update([$column => $relative]);
+                        $this->{$prop} = $relative;
+                    }
+                }
+            }
+        }
+
         $this->loadSkills();
     }
 
@@ -59,6 +86,16 @@ new #[Title('About')] class extends Component {
         $this->infoItems = array_values($this->infoItems);
     }
 
+    public function removeProfileImage(): void
+    {
+        $this->profileImageFile = null;
+    }
+
+    public function removeSignatureImage(): void
+    {
+        $this->signatureImageFile = null;
+    }
+
     public function save(): void
     {
         $this->validate([
@@ -68,11 +105,33 @@ new #[Title('About')] class extends Component {
             'paragraph1' => ['nullable', 'string', 'max:65535'],
             'paragraph2' => ['nullable', 'string', 'max:65535'],
             'profileImage' => ['nullable', 'string', 'max:255'],
+            'profileImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'signatureImage' => ['nullable', 'string', 'max:255'],
+            'signatureImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'signatureName' => ['nullable', 'string', 'max:255'],
             'signatureTitle' => ['nullable', 'string', 'max:255'],
             'infoItems' => ['nullable', 'array'],
         ]);
+
+        if ($this->profileImageFile) {
+            $path = $this->profileImageFile->store('about', 'public');
+
+            if ($this->profileImage && !str_contains($this->profileImage, '..')) {
+                Storage::disk('public')->delete($this->profileImage);
+            }
+
+            $this->profileImage = $path;
+        }
+
+        if ($this->signatureImageFile) {
+            $path = $this->signatureImageFile->store('about', 'public');
+
+            if ($this->signatureImage && !str_contains($this->signatureImage, '..')) {
+                Storage::disk('public')->delete($this->signatureImage);
+            }
+
+            $this->signatureImage = $path;
+        }
 
         AboutSection::firstOrFail()->update([
             'heading' => $this->heading,
@@ -86,6 +145,9 @@ new #[Title('About')] class extends Component {
             'signature_title' => $this->signatureTitle,
             'info_items' => $this->infoItems,
         ]);
+
+        $this->profileImageFile = null;
+        $this->signatureImageFile = null;
 
         Flux::toast(
             heading: 'About section saved',
@@ -232,16 +294,106 @@ new #[Title('About')] class extends Component {
         </div>
 
         <div>
-            <flux:heading level="3" size="lg">{{ __('Images') }}</flux:heading>
-            <div class="grid gap-4 md:grid-cols-2">
-                <flux:field>
-                    <flux:label>{{ __('Profile Image') }}</flux:label>
-                    <flux:input wire:model="profileImage" type="text" />
-                </flux:field>
-                <flux:field>
-                    <flux:label>{{ __('Signature Image') }}</flux:label>
-                    <flux:input wire:model="signatureImage" type="text" />
-                </flux:field>
+            <flux:heading level="3" size="lg">{{ __('Profile Image') }}</flux:heading>
+            <flux:text class="mt-1 mb-4">{{ __('Upload a profile image for the about section.') }}</flux:text>
+
+            <div class="flex items-center gap-6">
+                <div class="shrink-0">
+                    <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
+                        @if ($profileImageFile)
+                            <img src="{{ $profileImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
+                        @elseif ($profileImage && !str_starts_with($profileImage, 'asset/'))
+                            <img src="{{ Storage::url($profileImage) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current profile image') }}">
+                        @else
+                            <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <input
+                        type="file"
+                        wire:model="profileImageFile"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        class="hidden"
+                        x-ref="profileImageInput"
+                    />
+
+                    <div class="flex items-center gap-2">
+                        <flux:button type="button" variant="primary" x-on:click="$refs.profileImageInput.click()">
+                            {{ __('Upload Image') }}
+                        </flux:button>
+
+                        @if ($profileImageFile)
+                            <flux:button type="button" variant="ghost" wire:click="removeProfileImage" wire:loading.attr="disabled">
+                                {{ __('Remove Image') }}
+                            </flux:button>
+                        @endif
+                    </div>
+
+                    <div class="flex items-center gap-2 text-sm text-zinc-500">
+                        @if ($profileImageFile)
+                            <span>{{ $profileImageFile->getClientOriginalName() }}</span>
+                        @elseif ($profileImage)
+                            <span>{{ __('Current image loaded') }}</span>
+                        @else
+                            <span>{{ __('No file selected') }}</span>
+                        @endif
+                        <span wire:loading wire:target="profileImageFile">{{ __('Uploading...') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <flux:heading level="3" size="lg">{{ __('Signature Image') }}</flux:heading>
+            <flux:text class="mt-1 mb-4">{{ __('Upload a signature image for the about section.') }}</flux:text>
+
+            <div class="flex items-center gap-6">
+                <div class="shrink-0">
+                    <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
+                        @if ($signatureImageFile)
+                            <img src="{{ $signatureImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
+                        @elseif ($signatureImage && !str_starts_with($signatureImage, 'asset/'))
+                            <img src="{{ Storage::url($signatureImage) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current signature image') }}">
+                        @else
+                            <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <input
+                        type="file"
+                        wire:model="signatureImageFile"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        class="hidden"
+                        x-ref="signatureImageInput"
+                    />
+
+                    <div class="flex items-center gap-2">
+                        <flux:button type="button" variant="primary" x-on:click="$refs.signatureImageInput.click()">
+                            {{ __('Upload Image') }}
+                        </flux:button>
+
+                        @if ($signatureImageFile)
+                            <flux:button type="button" variant="ghost" wire:click="removeSignatureImage" wire:loading.attr="disabled">
+                                {{ __('Remove Image') }}
+                            </flux:button>
+                        @endif
+                    </div>
+
+                    <div class="flex items-center gap-2 text-sm text-zinc-500">
+                        @if ($signatureImageFile)
+                            <span>{{ $signatureImageFile->getClientOriginalName() }}</span>
+                        @elseif ($signatureImage)
+                            <span>{{ __('Current image loaded') }}</span>
+                        @else
+                            <span>{{ __('No file selected') }}</span>
+                        @endif
+                        <span wire:loading wire:target="signatureImageFile">{{ __('Uploading...') }}</span>
+                    </div>
+                </div>
             </div>
         </div>
 

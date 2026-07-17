@@ -52,7 +52,7 @@
                     </p>
                     @endif
                     <div class="profile d-flex align-items-center">
-                      <img src="{{ asset($testimonial->avatar ?? 'asset/img/person/person-m-7.webp') }}" class="profile-img" alt="">
+                      <img src="{{ $testimonial->avatar_path && !str_starts_with($testimonial->avatar_path, 'asset/') ? Storage::url($testimonial->avatar_path) : asset('asset/img/person/person-m-7.webp') }}" class="profile-img" alt="">
                       <div class="profile-info">
                         <h3>{{ $testimonial->name }}</h3>
                         <span>{{ $testimonial->role }}</span>
@@ -61,7 +61,7 @@
                   </div>
                   <div class="col-lg-4 d-none d-lg-block">
                     <div class="featured-img-wrapper">
-                      <img src="{{ asset($testimonial->avatar ?? 'asset/img/person/person-m-7.webp') }}" class="featured-img" alt="">
+                      <img src="{{ $testimonial->avatar_path && !str_starts_with($testimonial->avatar_path, 'asset/') ? Storage::url($testimonial->avatar_path) : asset('asset/img/person/person-m-7.webp') }}" class="featured-img" alt="">
                     </div>
                   </div>
                 </div>

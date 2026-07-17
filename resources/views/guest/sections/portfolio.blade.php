@@ -37,11 +37,11 @@
             <div class="col-lg-6 col-md-6 portfolio-item isotope-item filter-{{ \Illuminate\Support\Str::slug($item->category) }}">
               <div class="portfolio-card">
                 <div class="portfolio-image">
-                  <img src="{{ asset($item->image ?? 'asset/img/portfolio/portfolio-1.webp') }}" class="img-fluid" alt="" loading="lazy">
+                  <img src="{{ $item->image_path && !str_starts_with($item->image_path, 'asset/') ? Storage::url($item->image_path) : asset('asset/img/portfolio/portfolio-1.webp') }}" class="img-fluid" alt="" loading="lazy">
                   <div class="portfolio-overlay">
                     <div class="portfolio-actions">
-                      <a href="{{ asset($item->image ?? 'asset/img/portfolio/portfolio-1.webp') }}" class="glightbox preview-link" data-gallery="portfolio-gallery-{{ \Illuminate\Support\Str::slug($item->category) }}"><i class="bi bi-eye"></i></a>
-                      <a href="{{ $item->url ? route('portfolio.details', $item->url) : route('portfolio.details') }}" class="details-link"><i class="bi bi-arrow-right"></i></a>
+                      <a href="{{ $item->image_path && !str_starts_with($item->image_path, 'asset/') ? Storage::url($item->image_path) : asset('asset/img/portfolio/portfolio-1.webp') }}" class="glightbox preview-link" data-gallery="portfolio-gallery-{{ \Illuminate\Support\Str::slug($item->category) }}"><i class="bi bi-eye"></i></a>
+                      <a href="{{ $item->detail_url ? route('portfolio.details', $item->detail_url) : route('portfolio.details') }}" class="details-link"><i class="bi bi-arrow-right"></i></a>
                     </div>
                   </div>
                 </div>

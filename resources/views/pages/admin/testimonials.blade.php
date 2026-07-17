@@ -5,8 +5,12 @@ use App\Models\Site;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 
 new #[Title('Testimonials')] class extends Component {
+    use WithFileUploads;
+
     public array $testimonials = [];
     public string $sectionTitle = '';
     public string $sectionDescription = '';
@@ -19,7 +23,9 @@ new #[Title('Testimonials')] class extends Component {
     public string $quoteHeading = '';
     public string $quoteParagraphs = '';
     public string $avatarPath = '';
+    public $avatarFile = null;
     public string $featuredImagePath = '';
+    public $featuredImageFile = null;
     public int $sortOrder = 0;
     public bool $isActive = true;
 
@@ -65,10 +71,22 @@ new #[Title('Testimonials')] class extends Component {
         $this->quoteHeading = '';
         $this->quoteParagraphs = '';
         $this->avatarPath = '';
+        $this->avatarFile = null;
         $this->featuredImagePath = '';
+        $this->featuredImageFile = null;
         $this->sortOrder = 0;
         $this->isActive = true;
         $this->dispatch('modal-show', name: 'testimonial-form');
+    }
+
+    public function removeAvatar(): void
+    {
+        $this->avatarFile = null;
+    }
+
+    public function removeFeaturedImage(): void
+    {
+        $this->featuredImageFile = null;
     }
 
     public function save(): void
@@ -78,11 +96,33 @@ new #[Title('Testimonials')] class extends Component {
             'role' => ['required', 'string', 'max:255'],
             'quoteHeading' => ['nullable', 'string', 'max:255'],
             'quoteParagraphs' => ['required', 'string'],
-            'avatarPath' => ['required', 'string', 'max:255'],
+            'avatarPath' => ['required_without:avatarFile', 'string', 'max:255'],
+            'avatarFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'featuredImagePath' => ['nullable', 'string', 'max:255'],
+            'featuredImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'sortOrder' => ['required', 'integer', 'min:0'],
             'isActive' => ['boolean'],
         ]);
+
+        if ($this->avatarFile) {
+            $path = $this->avatarFile->store('testimonials', 'public');
+
+            if ($this->editId && $this->avatarPath && !str_contains($this->avatarPath, '..')) {
+                Storage::disk('public')->delete($this->avatarPath);
+            }
+
+            $this->avatarPath = $path;
+        }
+
+        if ($this->featuredImageFile) {
+            $path = $this->featuredImageFile->store('testimonials', 'public');
+
+            if ($this->editId && $this->featuredImagePath && !str_contains($this->featuredImagePath, '..')) {
+                Storage::disk('public')->delete($this->featuredImagePath);
+            }
+
+            $this->featuredImagePath = $path;
+        }
 
         $data = [
             'name' => $this->name,
@@ -119,7 +159,9 @@ new #[Title('Testimonials')] class extends Component {
         $this->quoteHeading = '';
         $this->quoteParagraphs = '';
         $this->avatarPath = '';
+        $this->avatarFile = null;
         $this->featuredImagePath = '';
+        $this->featuredImageFile = null;
         $this->sortOrder = 0;
         $this->isActive = true;
     }
@@ -136,6 +178,28 @@ new #[Title('Testimonials')] class extends Component {
         $this->featuredImagePath = $item->featured_image_path ?? '';
         $this->sortOrder = $item->sort_order;
         $this->isActive = $item->is_active;
+
+        // Backward compatibility: convert legacy full URLs to relative paths
+        foreach (['avatarPath' => 'avatar_path', 'featuredImagePath' => 'featured_image_path'] as $prop => $column) {
+            $value = $this->{$prop};
+            if ($value
+                && (str_starts_with($value, 'http://')
+                    || str_starts_with($value, 'https://'))
+            ) {
+                $parsedPath = parse_url($value, PHP_URL_PATH);
+                $prefix = '/storage/';
+
+                if ($parsedPath && str_starts_with($parsedPath, $prefix)) {
+                    $relative = ltrim(substr($parsedPath, strlen($prefix)), '/');
+
+                    if ($relative) {
+                        $item->update([$column => $relative]);
+                        $this->{$prop} = $relative;
+                    }
+                }
+            }
+        }
+
         Flux::modal('testimonial-form')->show();
     }
 
@@ -148,7 +212,18 @@ new #[Title('Testimonials')] class extends Component {
     public function delete(): void
     {
         if (!$this->deleteId) return;
-        Testimonial::findOrFail($this->deleteId)->delete();
+
+        $item = Testimonial::findOrFail($this->deleteId);
+
+        // Delete associated images
+        if ($item->avatar_path && !str_contains($item->avatar_path, '..')) {
+            Storage::disk('public')->delete($item->avatar_path);
+        }
+        if ($item->featured_image_path && !str_contains($item->featured_image_path, '..')) {
+            Storage::disk('public')->delete($item->featured_image_path);
+        }
+
+        $item->delete();
         $this->loadTestimonials();
         $this->deleteId = null;
         Flux::modal('delete-testimonial-confirm')->close();
@@ -246,7 +321,7 @@ new #[Title('Testimonials')] class extends Component {
         @endif
     </div>
 
-    <flux:modal name="testimonial-form" class="min-w-[28rem]">
+    <flux:modal name="testimonial-form" class="min-w-[32rem]">
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg">{{ $editId ? __('Edit Testimonial') : __('Add Testimonial') }}</flux:heading>
@@ -271,16 +346,111 @@ new #[Title('Testimonials')] class extends Component {
                 <flux:textarea wire:model="quoteParagraphs" rows="4" />
                 <flux:error class="mt-1 text-xs text-zinc-400">{{ __('Separate paragraphs with a blank line.') }}</flux:error>
             </flux:field>
-            <div class="grid gap-4 md:grid-cols-2">
-                <flux:field>
-                    <flux:label>{{ __('Avatar Path') }}</flux:label>
-                    <flux:input wire:model="avatarPath" type="text" />
-                </flux:field>
-                <flux:field>
-                    <flux:label>{{ __('Featured Image Path') }}</flux:label>
-                    <flux:input wire:model="featuredImagePath" type="text" />
-                </flux:field>
+
+            <div>
+                <flux:label>{{ __('Avatar Image') }}</flux:label>
+                <flux:text class="mt-1 mb-4">{{ __('Upload an avatar image.') }}</flux:text>
+
+                <div class="flex items-center gap-6">
+                    <div class="shrink-0">
+                        <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
+                            @if ($avatarFile)
+                                <img src="{{ $avatarFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
+                            @elseif ($avatarPath && !str_starts_with($avatarPath, 'asset/'))
+                                <img src="{{ Storage::url($avatarPath) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current avatar') }}">
+                            @else
+                                <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <input
+                            type="file"
+                            wire:model="avatarFile"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            class="hidden"
+                            x-ref="avatarInput"
+                        />
+
+                        <div class="flex items-center gap-2">
+                            <flux:button type="button" variant="primary" x-on:click="$refs.avatarInput.click()">
+                                {{ __('Upload Image') }}
+                            </flux:button>
+
+                            @if ($avatarFile)
+                                <flux:button type="button" variant="ghost" wire:click="removeAvatar" wire:loading.attr="disabled">
+                                    {{ __('Remove Image') }}
+                                </flux:button>
+                            @endif
+                        </div>
+
+                        <div class="flex items-center gap-2 text-sm text-zinc-500">
+                            @if ($avatarFile)
+                                <span>{{ $avatarFile->getClientOriginalName() }}</span>
+                            @elseif ($avatarPath)
+                                <span>{{ __('Current image loaded') }}</span>
+                            @else
+                                <span>{{ __('No file selected') }}</span>
+                            @endif
+                            <span wire:loading wire:target="avatarFile">{{ __('Uploading...') }}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <div>
+                <flux:label>{{ __('Featured Image') }}</flux:label>
+                <flux:text class="mt-1 mb-4">{{ __('Upload a featured image (optional).') }}</flux:text>
+
+                <div class="flex items-center gap-6">
+                    <div class="shrink-0">
+                        <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
+                            @if ($featuredImageFile)
+                                <img src="{{ $featuredImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
+                            @elseif ($featuredImagePath && !str_starts_with($featuredImagePath, 'asset/'))
+                                <img src="{{ Storage::url($featuredImagePath) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current featured image') }}">
+                            @else
+                                <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <input
+                            type="file"
+                            wire:model="featuredImageFile"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            class="hidden"
+                            x-ref="featuredImageInput"
+                        />
+
+                        <div class="flex items-center gap-2">
+                            <flux:button type="button" variant="primary" x-on:click="$refs.featuredImageInput.click()">
+                                {{ __('Upload Image') }}
+                            </flux:button>
+
+                            @if ($featuredImageFile)
+                                <flux:button type="button" variant="ghost" wire:click="removeFeaturedImage" wire:loading.attr="disabled">
+                                    {{ __('Remove Image') }}
+                                </flux:button>
+                            @endif
+                        </div>
+
+                        <div class="flex items-center gap-2 text-sm text-zinc-500">
+                            @if ($featuredImageFile)
+                                <span>{{ $featuredImageFile->getClientOriginalName() }}</span>
+                            @elseif ($featuredImagePath)
+                                <span>{{ __('Current image loaded') }}</span>
+                            @else
+                                <span>{{ __('No file selected') }}</span>
+                            @endif
+                            <span wire:loading wire:target="featuredImageFile">{{ __('Uploading...') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <flux:field>
                 <flux:label>{{ __('Display Order') }}</flux:label>
                 <flux:input wire:model="sortOrder" type="number" min="0" />
