@@ -1,6 +1,6 @@
 @extends('guest.layouts.app')
 
-@section('title', 'Starter Page - EasyFolio')
+@section('title', 'Starter Page - Personal Branding')
 @section('meta_description', 'A blank starter page for building custom content.')
 @section('meta_keywords', 'starter, template, page')
 @section('body_class', 'starter-page-page')

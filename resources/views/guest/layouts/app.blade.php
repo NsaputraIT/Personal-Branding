@@ -4,13 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>@yield('title', 'EasyFolio') - {{ config('app.name', 'Laravel') }}</title>
+  <title>@yield('title', 'Personal Branding') - {{ config('app.name') }}</title>
   <meta name="description" content="@yield('meta_description', '')">
   <meta name="keywords" content="@yield('meta_keywords', '')">
 
   <!-- Favicons -->
-  <link href="{{ asset('asset/img/favicon.png') }}" rel="icon">
-  <link href="{{ asset('asset/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+  <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com" rel="preconnect">

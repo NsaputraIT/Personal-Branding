@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>@yield('title', 'EasyFolio') - {{ config('app.name', 'Laravel') }}</title>
+  <title>@yield('title', 'Personal Branding') - {{ config('app.name') }}</title>
   <meta name="description" content="@yield('meta_description', '')">
   <meta name="keywords" content="@yield('meta_keywords', '')">
 
@@ -37,7 +37,7 @@
 
       <a href="{{ route('portfolio.home') }}" class="logo d-flex align-items-center me-auto me-xl-0">
         <!-- <img src="{{ asset('asset/img/logo.webp') }}" alt=""> -->
-        <h1 class="sitename">EasyFolio</h1>
+        <h1 class="sitename">Personal Branding</h1>
       </a>
 
       <nav id="navmenu" class="navmenu">
@@ -87,7 +87,7 @@
 
     <div class="container">
       <div class="copyright text-center ">
-        <p>© <span>Copyright</span> <strong class="px-1 sitename">EasyFolio</strong> <span>All Rights Reserved</span></p>
+        <p>© <span>Copyright</span> <strong class="px-1 sitename">Personal Branding</strong> <span>All Rights Reserved</span></p>
       </div>
       <div class="social-links d-flex justify-content-center">
         <a href=""><i class="bi bi-twitter-x"></i></a>
@@ -96,7 +96,7 @@
         <a href=""><i class="bi bi-linkedin"></i></a>
       </div>
       <div class="credits">
-        Designed by <a href="https://bootstrapmade.com/">BootstrapMade</a>
+        Crafted with &hearts; by Personal Branding
       </div>
     </div>
 

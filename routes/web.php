@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'guest.home')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
 
     Route::livewire('admin/basecolorguest', 'pages::admin.basecolorguest')
@@ -45,6 +45,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('admin/resume', 'pages::admin.resume')
         ->name('admin.resume');
+
+    Route::livewire('admin/data-user', 'pages::admin.data-user')
+        ->name('admin.data-user');
 });
 
 Route::prefix('portfolio')->name('portfolio.')->group(function () {

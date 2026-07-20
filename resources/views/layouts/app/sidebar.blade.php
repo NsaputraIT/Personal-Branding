@@ -122,6 +122,15 @@
                         {{ __('Footer') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
+
+                <flux:sidebar.item
+                    icon="users"
+                    :href="route('admin.data-user')"
+                    :current="request()->routeIs('admin.data-user')"
+                    wire:navigate
+                >
+                    {{ __('Data User') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:spacer />

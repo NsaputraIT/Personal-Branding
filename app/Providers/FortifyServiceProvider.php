@@ -4,17 +4,13 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
-use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
-use Laravel\Fortify\Actions\PrepareAuthenticatedSession;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -34,7 +30,6 @@ class FortifyServiceProvider extends ServiceProvider
     {
         $this->configureActions();
         $this->configureViews();
-        $this->configureDummyLogin();
         $this->configureRateLimiting();
     }
 
@@ -62,47 +57,6 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::registerView(fn () => view('pages::auth.register'));
         Fortify::resetPasswordView(fn () => view('pages::auth.reset-password'));
         Fortify::requestPasswordResetLinkView(fn () => view('pages::auth.forgot-password'));
-    }
-
-    /**
-     * Configure the temporary dummy admin login.
-     */
-    private function configureDummyLogin(): void
-    {
-        Fortify::authenticateThrough(function (Request $request) {
-            return [
-                function ($request, $next) {
-                    if ($request->email !== 'test@gmail.com') {
-                        throw ValidationException::withMessages([
-                            'email' => __('Gagal login, email anda salah !'),
-                        ]);
-                    }
-
-                    if ($request->password !== 'test123') {
-                        throw ValidationException::withMessages([
-                            'password' => __('Gagal login, password anda salah !'),
-                        ]);
-                    }
-
-                    return $next($request);
-                },
-                function ($request, $next) {
-                    $user = User::firstOrCreate(
-                        ['email' => 'test@gmail.com'],
-                        [
-                            'name' => 'Test',
-                            'password' => 'test123',
-                            'email_verified_at' => now(),
-                        ],
-                    );
-
-                    Auth::guard(config('fortify.guard', 'web'))->login($user, $request->boolean('remember'));
-
-                    return $next($request);
-                },
-                PrepareAuthenticatedSession::class,
-            ];
-        });
     }
 
     /**

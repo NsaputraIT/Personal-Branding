@@ -39,7 +39,7 @@
                 </div>
 
                 <div class="mt-2 text-xl font-semibold">
-                    Laravel 13
+                    Personal Branding
                 </div>
             </div>
 

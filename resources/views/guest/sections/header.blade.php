@@ -31,13 +31,5 @@
         <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
       </nav>
 
-      <div class="header-social-links d-none d-md-flex">
-        @foreach ($socialMedia as $sm)
-            <a href="{{ $sm->medsos_url ?: '#' }}" class="{{ $sm->medsos_icon }}">
-                <i class="{{ $platformMap[$sm->medsos_icon]['icon'] ?? 'bi-link-45deg' }}"></i>
-            </a>
-        @endforeach
-      </div>
-
     </div>
 </header>

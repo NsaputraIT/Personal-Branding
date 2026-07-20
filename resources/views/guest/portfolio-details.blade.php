@@ -1,6 +1,6 @@
 @extends('guest.layouts.app')
 
-@section('title', 'Portfolio Details - EasyFolio')
+@section('title', 'Portfolio Details - Personal Branding')
 @section('meta_description', 'Detailed view of our portfolio project.')
 @section('meta_keywords', 'portfolio, project, web design, case study')
 @section('body_class', 'portfolio-details-page')
