@@ -38,6 +38,15 @@
                     >
                         {{ __('Medsos') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="users"
+                        :href="route('admin.data-user')"
+                        :current="request()->routeIs('admin.data-user')"
+                        wire:navigate
+                    >
+                        {{ __('Data User') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
 
                 <flux:sidebar.group :heading="__('Content')" class="grid">
@@ -123,14 +132,6 @@
                     </flux:sidebar.item>
                 </flux:sidebar.group>
 
-                <flux:sidebar.item
-                    icon="users"
-                    :href="route('admin.data-user')"
-                    :current="request()->routeIs('admin.data-user')"
-                    wire:navigate
-                >
-                    {{ __('Data User') }}
-                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:spacer />
@@ -169,7 +170,7 @@
                     <flux:menu.separator />
 
                     <flux:menu.radio.group>
-                        <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
+                        <flux:menu.item :href="route('appearance.edit')" icon="cog" wire:navigate>
                             {{ __('Settings') }}
                         </flux:menu.item>
                     </flux:menu.radio.group>
