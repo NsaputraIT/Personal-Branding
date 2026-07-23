@@ -1,4 +1,7 @@
-@php $about = \App\Models\AboutSection::first(); @endphp
+@php
+    $about = \App\Models\AboutSection::first();
+    $cdnUrl = config('filesystems.disks.cdn.url');
+@endphp
 
 <section id="about" class="about section light-background">
 
@@ -17,7 +20,7 @@
         <div class="row align-items-center">
           <div class="col-lg-6 position-relative" data-aos="fade-right" data-aos-delay="200">
             <div class="about-image">
-              <img src="{{ $about->profile_image && !str_starts_with($about->profile_image, 'asset/') ? Storage::url($about->profile_image) : asset('asset/img/profile/profile-square-2.webp') }}" alt="Profile Image" class="img-fluid rounded-4">
+              <img src="{{ $about->profile_image && !str_starts_with($about->profile_image, 'asset/') ? $cdnUrl . '/' . ltrim($about->profile_image, '/') : asset('asset/img/profile/profile-square-2.webp') }}" alt="Profile Image" class="img-fluid rounded-4">
             </div>
           </div>
 
@@ -46,7 +49,7 @@
 
               <div class="signature mt-4">
                 <div class="signature-image">
-                  <img src="{{ $about->signature_image && !str_starts_with($about->signature_image, 'asset/') ? Storage::url($about->signature_image) : asset('asset/img/misc/signature-1.webp') }}" alt="" class="img-fluid">
+                  <img src="{{ $about->signature_image && !str_starts_with($about->signature_image, 'asset/') ? $cdnUrl . '/' . ltrim($about->signature_image, '/') : asset('asset/img/misc/signature-1.webp') }}" alt="" class="img-fluid">
                 </div>
                 <div class="signature-info">
                   <h4>{{ $about->signature_name ?? 'Eliot Johnson' }}</h4>

@@ -1,4 +1,7 @@
-@php $hero = \App\Models\HeroSection::first(); @endphp
+@php
+    $hero = \App\Models\HeroSection::first();
+    $cdnUrl = config('filesystems.disks.cdn.url');
+@endphp
 
 <section id="hero" class="hero section">
 
@@ -23,7 +26,7 @@
           </div>
           <div class="col-lg-6">
             <div class="hero-image">
-              <img src="{{ $hero->profile_image ? Storage::url($hero->profile_image) : asset('asset/img/preview-images-kosong.png') }}" alt="Portfolio Hero Image" class="img-fluid" data-aos="zoom-out" data-aos-delay="300">
+              <img src="{{ $hero->profile_image && !str_starts_with($hero->profile_image, 'asset/') ? $cdnUrl . '/' . ltrim($hero->profile_image, '/') : asset($hero->profile_image ?? 'asset/img/preview-images-kosong.png') }}" alt="Portfolio Hero Image" class="img-fluid" data-aos="zoom-out" data-aos-delay="300">
               <div class="shape-1"></div>
               <div class="shape-2"></div>
             </div>

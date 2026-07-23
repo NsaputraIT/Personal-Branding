@@ -2,14 +2,13 @@
 
 use App\Models\PortfolioItem;
 use App\Models\Site;
+use App\Services\CdnUploadService;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
-use Livewire\WithFileUploads;
-use Illuminate\Support\Facades\Storage;
 
 new #[Title('Portfolio')] class extends Component {
-    use WithFileUploads;
+    private CdnUploadService $cdn;
 
     public array $items = [];
     public string $sectionTitle = '';
@@ -21,13 +20,17 @@ new #[Title('Portfolio')] class extends Component {
     public string $category = '';
     public string $title = '';
     public string $description = '';
-    public string $imagePath = '';
-    public $imageFile = null;
+    public string $imagePath = ''; // CDN path
     public string $detailUrl = '';
     public int $sortOrder = 0;
     public bool $isActive = true;
 
     public array $categories = ['web', 'graphics', 'motion', 'brand'];
+
+    public function boot(CdnUploadService $cdn): void
+    {
+        $this->cdn = $cdn;
+    }
 
     public function mount(): void
     {
@@ -63,6 +66,11 @@ new #[Title('Portfolio')] class extends Component {
         $site->save();
     }
 
+    public function generatePresignedUrl(): array
+    {
+        return $this->cdn->deleteOldAndGeneratePresignedUrl('portfolio', $this->imagePath);
+    }
+
     public function add(): void
     {
         $this->editId = null;
@@ -70,16 +78,10 @@ new #[Title('Portfolio')] class extends Component {
         $this->title = '';
         $this->description = '';
         $this->imagePath = '';
-        $this->imageFile = null;
         $this->detailUrl = '';
         $this->sortOrder = 0;
         $this->isActive = true;
         $this->dispatch('modal-show', name: 'portfolio-form');
-    }
-
-    public function removeImage(): void
-    {
-        $this->imageFile = null;
     }
 
     public function save(): void
@@ -88,22 +90,11 @@ new #[Title('Portfolio')] class extends Component {
             'category' => ['required', 'string', 'max:100'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
-            'imagePath' => ['required_without:imageFile', 'string', 'max:255'],
-            'imageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'imagePath' => ['required', 'string', 'max:500'],
             'detailUrl' => ['nullable', 'string', 'max:255'],
             'sortOrder' => ['required', 'integer', 'min:0'],
             'isActive' => ['boolean'],
         ]);
-
-        if ($this->imageFile) {
-            $path = $this->imageFile->store('portfolio', 'public');
-
-            if ($this->editId && $this->imagePath && !str_contains($this->imagePath, '..')) {
-                Storage::disk('public')->delete($this->imagePath);
-            }
-
-            $this->imagePath = $path;
-        }
 
         $data = [
             'category' => $this->category,
@@ -138,7 +129,6 @@ new #[Title('Portfolio')] class extends Component {
         $this->title = '';
         $this->description = '';
         $this->imagePath = '';
-        $this->imageFile = null;
         $this->detailUrl = '';
         $this->sortOrder = 0;
         $this->isActive = true;
@@ -189,10 +179,8 @@ new #[Title('Portfolio')] class extends Component {
 
         $item = PortfolioItem::findOrFail($this->deleteId);
 
-        // Delete associated image
-        if ($item->image_path && !str_contains($item->image_path, '..')) {
-            Storage::disk('public')->delete($item->image_path);
-        }
+        // Delete associated image from CDN
+        $this->cdn->delete($item->image_path);
 
         $item->delete();
         $this->loadItems();
@@ -317,54 +305,62 @@ new #[Title('Portfolio')] class extends Component {
 
             <div>
                 <flux:label>{{ __('Image') }}</flux:label>
-                <flux:text class="mt-1 mb-4">{{ __('Upload an image or enter a path.') }}</flux:text>
+                <flux:text class="mt-1 mb-4">{{ __('Upload an image. It will be resized and converted to WebP automatically.') }}</flux:text>
 
-                <div class="flex items-center gap-6">
+                @php $cdnUrl = config('filesystems.disks.cdn.url'); @endphp
+
+                <div class="flex items-center gap-6" x-data>
                     <div class="shrink-0">
                         <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
-                            @if ($imageFile)
-                                <img src="{{ $imageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
-                            @elseif ($imagePath && !str_starts_with($imagePath, 'asset/'))
-                                <img src="{{ Storage::url($imagePath) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current image') }}">
-                            @else
-                                <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
-                            @endif
+                            <img src="{{ $imagePath && !str_starts_with($imagePath, 'asset/') ? $cdnUrl . '/' . ltrim($imagePath, '/') : asset($imagePath && str_starts_with($imagePath, 'asset/') ? $imagePath : 'asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}" id="portfolio-preview">
                         </div>
                     </div>
 
                     <div class="flex flex-col gap-2">
                         <input
                             type="file"
-                            wire:model="imageFile"
-                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            accept="image/*"
                             class="hidden"
                             x-ref="imageInput"
+                            @change="
+                                const file = $event.target.files[0];
+                                if (!file) return;
+                                const status = $el.closest('.flex').querySelector('.upload-status');
+                                status.textContent = 'Processing...';
+                                window.cdnUploader.fullPipeline(
+                                    file, 'portfolio',
+                                    () => $wire.generatePresignedUrl(),
+                                    (path) => $wire.set('imagePath', path)
+                                ).then((path) => {
+                                    status.textContent = 'Upload complete';
+                                    document.getElementById('portfolio-preview').src = '{{ $cdnUrl }}/' + (path.charAt(0) === '/' ? path.slice(1) : path);
+                                }).catch((err) => {
+                                    status.textContent = 'Upload failed: ' + err.message;
+                                });
+                            "
                         />
 
                         <div class="flex items-center gap-2">
                             <flux:button type="button" variant="primary" x-on:click="$refs.imageInput.click()">
                                 {{ __('Upload Image') }}
                             </flux:button>
-
-                            @if ($imageFile)
-                                <flux:button type="button" variant="ghost" wire:click="removeImage" wire:loading.attr="disabled">
-                                    {{ __('Remove Image') }}
-                                </flux:button>
-                            @endif
                         </div>
 
                         <div class="flex items-center gap-2 text-sm text-zinc-500">
-                            @if ($imageFile)
-                                <span>{{ $imageFile->getClientOriginalName() }}</span>
-                            @elseif ($imagePath)
-                                <span>{{ __('Current image loaded') }}</span>
-                            @else
-                                <span>{{ __('No file selected') }}</span>
-                            @endif
-                            <span wire:loading wire:target="imageFile">{{ __('Uploading...') }}</span>
+                            <span class="upload-status">
+                                @if ($imagePath && !str_starts_with($imagePath, 'asset/'))
+                                    {{ __('CDN image loaded') }}
+                                @elseif ($imagePath)
+                                    {{ __('Current image loaded') }}
+                                @else
+                                    {{ __('No file selected') }}
+                                @endif
+                            </span>
                         </div>
                     </div>
                 </div>
+
+                <flux:error wire:model="imagePath" class="mt-2" />
             </div>
 
             <flux:field>

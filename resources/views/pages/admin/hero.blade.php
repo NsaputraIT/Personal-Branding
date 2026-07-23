@@ -1,24 +1,27 @@
 <?php
 
 use App\Models\HeroSection;
+use App\Services\CdnUploadService;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
-use Livewire\WithFileUploads;
-use Illuminate\Support\Facades\Storage;
 
 new #[Title('Hero Section')] class extends Component {
-    use WithFileUploads;
-
     public string $heading = '';
     public string $subheading = '';
     public string $ctaPrimaryText = '';
     public string $ctaPrimaryUrl = '';
     public string $ctaSecondaryText = '';
     public string $ctaSecondaryUrl = '';
-    public string $profileImage = '';
-    public $profileImageFile = null;
+    public string $cdnPath = ''; // CDN path, e.g. /hero/timestamp_random.webp
     public array $stats = [];
+
+    private CdnUploadService $cdn;
+
+    public function boot(CdnUploadService $cdn): void
+    {
+        $this->cdn = $cdn;
+    }
 
     public function mount(): void
     {
@@ -29,15 +32,15 @@ new #[Title('Hero Section')] class extends Component {
         $this->ctaPrimaryUrl = $hero->cta_primary_url ?? '';
         $this->ctaSecondaryText = $hero->cta_secondary_text ?? '';
         $this->ctaSecondaryUrl = $hero->cta_secondary_url ?? '';
-        $this->profileImage = $hero->profile_image ?? '';
+        $this->cdnPath = $hero->profile_image ?? '';
         $this->stats = $hero->stats ?? [];
 
         // Backward compatibility: convert legacy full URLs to relative paths
-        if ($this->profileImage
-            && (str_starts_with($this->profileImage, 'http://')
-                || str_starts_with($this->profileImage, 'https://'))
+        if ($this->cdnPath
+            && (str_starts_with($this->cdnPath, 'http://')
+                || str_starts_with($this->cdnPath, 'https://'))
         ) {
-            $parsedPath = parse_url($this->profileImage, PHP_URL_PATH);
+            $parsedPath = parse_url($this->cdnPath, PHP_URL_PATH);
             $prefix = '/storage/';
 
             if ($parsedPath && str_starts_with($parsedPath, $prefix)) {
@@ -45,10 +48,15 @@ new #[Title('Hero Section')] class extends Component {
 
                 if ($relative) {
                     HeroSection::firstOrFail()->update(['profile_image' => $relative]);
-                    $this->profileImage = $relative;
+                    $this->cdnPath = $relative;
                 }
             }
         }
+    }
+
+    public function generatePresignedUrl(string $directory): array
+    {
+        return $this->cdn->deleteOldAndGeneratePresignedUrl($directory, $this->cdnPath);
     }
 
     public function addStat(): void
@@ -62,11 +70,6 @@ new #[Title('Hero Section')] class extends Component {
         $this->stats = array_values($this->stats);
     }
 
-    public function removeImage(): void
-    {
-        $this->profileImageFile = null;
-    }
-
     public function save(): void
     {
         $this->validate([
@@ -76,20 +79,9 @@ new #[Title('Hero Section')] class extends Component {
             'ctaPrimaryUrl' => ['nullable', 'string', 'max:255'],
             'ctaSecondaryText' => ['nullable', 'string', 'max:255'],
             'ctaSecondaryUrl' => ['nullable', 'string', 'max:255'],
-            'profileImage' => ['nullable', 'string', 'max:255'],
-            'profileImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'cdnPath' => ['nullable', 'string', 'max:500'],
             'stats' => ['nullable', 'array'],
         ]);
-
-        if ($this->profileImageFile) {
-            $path = $this->profileImageFile->store('hero', 'public');
-
-            if ($this->profileImage) {
-                Storage::disk('public')->delete($this->profileImage);
-            }
-
-            $this->profileImage = $path;
-        }
 
         HeroSection::firstOrFail()->update([
             'heading' => $this->heading,
@@ -98,11 +90,9 @@ new #[Title('Hero Section')] class extends Component {
             'cta_primary_url' => $this->ctaPrimaryUrl,
             'cta_secondary_text' => $this->ctaSecondaryText,
             'cta_secondary_url' => $this->ctaSecondaryUrl,
-            'profile_image' => $this->profileImage,
+            'profile_image' => $this->cdnPath,
             'stats' => $this->stats,
         ]);
-
-        $this->profileImageFile = null;
 
         Flux::toast(
             heading: 'Hero section saved',
@@ -165,51 +155,64 @@ new #[Title('Hero Section')] class extends Component {
 
         <div>
             <flux:heading level="3" size="lg">{{ __('Profile Image') }}</flux:heading>
-            <flux:text class="mt-1 mb-4">{{ __('Upload a profile image for the hero section.') }}</flux:text>
+            <flux:text class="mt-1 mb-4">{{ __('Upload a profile image for the hero section. Image will be resized and converted to WebP automatically.') }}</flux:text>
 
             <div class="flex items-center gap-6">
                 <div class="shrink-0">
                     <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
-                        @if ($profileImageFile)
-                            <img src="{{ $profileImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
-                        @elseif ($profileImage)
-                            <img src="{{ Storage::url($profileImage) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current profile image') }}">
-                        @else
-                            <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
-                        @endif
+                        @php $cdnUrl = config('filesystems.disks.cdn.url'); @endphp
+                        <img src="{{ $cdnPath && !str_starts_with($cdnPath, 'asset/') ? $cdnUrl . '/' . ltrim($cdnPath, '/') : asset($cdnPath && str_starts_with($cdnPath, 'asset/') ? $cdnPath : 'asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ $cdnPath ? __('Current profile image') : __('No image selected') }}" id="hero-preview">
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-2" x-data>
                     <input
                         type="file"
-                        wire:model="profileImageFile"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        accept="image/*"
                         class="hidden"
-                        x-ref="profileImageInput"
+                        x-ref="fileInput"
+                        @change="
+                            const file = $event.target.files[0];
+                            if (!file) return;
+                            const btn = $el.closest('.flex').querySelector('.upload-btn');
+                            const status = $el.closest('.flex').querySelector('.upload-status');
+                            btn.disabled = true;
+                            status.textContent = 'Processing...';
+                            window.cdnUploader.fullPipeline(
+                                file,
+                                'hero',
+                                (dir) => $wire.generatePresignedUrl(dir),
+                                (path) => $wire.set('cdnPath', path),
+                            ).then((path) => {
+                                status.textContent = 'Upload complete';
+                                btn.disabled = false;
+                                // Refresh preview
+                                const cdnUrl = '{{ $cdnUrl }}';
+                                document.getElementById('hero-preview').src = cdnUrl + '/' + (path.charAt(0) === '/' ? path.slice(1) : path);
+                            }).catch((err) => {
+                                status.textContent = 'Upload failed: ' + err.message;
+                                btn.disabled = false;
+                            });
+                        "
                     />
 
                     <div class="flex items-center gap-2">
-                        <flux:button type="button" variant="primary" x-on:click="$refs.profileImageInput.click()">
+                        <flux:button type="button" variant="primary" class="upload-btn" x-on:click="$refs.fileInput.click()">
                             {{ __('Upload Image') }}
                         </flux:button>
-
-                        @if ($profileImageFile)
-                            <flux:button type="button" variant="ghost" wire:click="removeImage" wire:loading.attr="disabled">
-                                {{ __('Remove Image') }}
-                            </flux:button>
-                        @endif
                     </div>
 
                     <div class="flex items-center gap-2 text-sm text-zinc-500">
-                        @if ($profileImageFile)
-                            <span>{{ $profileImageFile->getClientOriginalName() }}</span>
-                        @elseif ($profileImage)
-                            <span>{{ __('Current image loaded') }}</span>
-                        @else
-                            <span>{{ __('No file selected') }}</span>
-                        @endif
-                        <span wire:loading wire:target="profileImageFile">{{ __('Uploading...') }}</span>
+                        <span class="upload-status">
+                            @if ($cdnPath && !str_starts_with($cdnPath, 'asset/'))
+                                {{ __('CDN image loaded') }}
+                            @elseif ($cdnPath)
+                                {{ __('Current image loaded') }}
+                            @else
+                                {{ __('No file selected') }}
+                            @endif
+                        </span>
+                        <span wire:loading wire:target="generatePresignedUrl">{{ __('Processing...') }}</span>
                     </div>
                 </div>
             </div>

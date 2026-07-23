@@ -2,14 +2,13 @@
 
 use App\Models\AboutSection;
 use App\Models\Skill;
+use App\Services\CdnUploadService;
 use Flux\Flux;
 use Livewire\Component;
 use Livewire\Attributes\Title;
-use Livewire\WithFileUploads;
-use Illuminate\Support\Facades\Storage;
 
 new #[Title('About')] class extends Component {
-    use WithFileUploads;
+    private CdnUploadService $cdn;
 
     // --- About section fields ---
     public string $heading = '';
@@ -17,10 +16,8 @@ new #[Title('About')] class extends Component {
     public string $subtitle = '';
     public string $paragraph1 = '';
     public string $paragraph2 = '';
-    public string $profileImage = '';
-    public $profileImageFile = null;
-    public string $signatureImage = '';
-    public $signatureImageFile = null;
+    public string $profileImagePath = ''; // CDN path
+    public string $signatureImagePath = ''; // CDN path
     public string $signatureName = '';
     public string $signatureTitle = '';
     public array $infoItems = [];
@@ -35,6 +32,11 @@ new #[Title('About')] class extends Component {
     public int $skillSortOrder = 0;
     public bool $skillIsActive = true;
 
+    public function boot(CdnUploadService $cdn): void
+    {
+        $this->cdn = $cdn;
+    }
+
     public function mount(): void
     {
         $about = AboutSection::firstOrFail();
@@ -43,14 +45,14 @@ new #[Title('About')] class extends Component {
         $this->subtitle = $about->subtitle ?? '';
         $this->paragraph1 = $about->paragraph1 ?? '';
         $this->paragraph2 = $about->paragraph2 ?? '';
-        $this->profileImage = $about->profile_image ?? '';
-        $this->signatureImage = $about->signature_image ?? '';
+        $this->profileImagePath = $about->profile_image ?? '';
+        $this->signatureImagePath = $about->signature_image ?? '';
         $this->signatureName = $about->signature_name ?? '';
         $this->signatureTitle = $about->signature_title ?? '';
         $this->infoItems = $about->info_items ?? [];
 
         // Backward compatibility: convert legacy full URLs to relative paths
-        foreach (['profileImage' => 'profile_image', 'signatureImage' => 'signature_image'] as $prop => $column) {
+        foreach (['profileImagePath' => 'profile_image', 'signatureImagePath' => 'signature_image'] as $prop => $column) {
             $value = $this->{$prop};
             if ($value
                 && (str_starts_with($value, 'http://')
@@ -75,6 +77,21 @@ new #[Title('About')] class extends Component {
 
     // ==================== ABOUT METHODS ====================
 
+    public function generatePresignedUrl(string $field): array
+    {
+        $directory = 'about';
+
+        if ($field === 'profileImagePath') {
+            return $this->cdn->deleteOldAndGeneratePresignedUrl($directory, $this->profileImagePath);
+        }
+
+        if ($field === 'signatureImagePath') {
+            return $this->cdn->deleteOldAndGeneratePresignedUrl($directory, $this->signatureImagePath);
+        }
+
+        return $this->cdn->generatePresignedUrl($directory);
+    }
+
     public function addInfoItem(): void
     {
         $this->infoItems[] = ['label' => '', 'value' => ''];
@@ -86,16 +103,6 @@ new #[Title('About')] class extends Component {
         $this->infoItems = array_values($this->infoItems);
     }
 
-    public function removeProfileImage(): void
-    {
-        $this->profileImageFile = null;
-    }
-
-    public function removeSignatureImage(): void
-    {
-        $this->signatureImageFile = null;
-    }
-
     public function save(): void
     {
         $this->validate([
@@ -104,34 +111,12 @@ new #[Title('About')] class extends Component {
             'subtitle' => ['nullable', 'string', 'max:255'],
             'paragraph1' => ['nullable', 'string', 'max:65535'],
             'paragraph2' => ['nullable', 'string', 'max:65535'],
-            'profileImage' => ['nullable', 'string', 'max:255'],
-            'profileImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'signatureImage' => ['nullable', 'string', 'max:255'],
-            'signatureImageFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'profileImagePath' => ['nullable', 'string', 'max:500'],
+            'signatureImagePath' => ['nullable', 'string', 'max:500'],
             'signatureName' => ['nullable', 'string', 'max:255'],
             'signatureTitle' => ['nullable', 'string', 'max:255'],
             'infoItems' => ['nullable', 'array'],
         ]);
-
-        if ($this->profileImageFile) {
-            $path = $this->profileImageFile->store('about', 'public');
-
-            if ($this->profileImage && !str_contains($this->profileImage, '..')) {
-                Storage::disk('public')->delete($this->profileImage);
-            }
-
-            $this->profileImage = $path;
-        }
-
-        if ($this->signatureImageFile) {
-            $path = $this->signatureImageFile->store('about', 'public');
-
-            if ($this->signatureImage && !str_contains($this->signatureImage, '..')) {
-                Storage::disk('public')->delete($this->signatureImage);
-            }
-
-            $this->signatureImage = $path;
-        }
 
         AboutSection::firstOrFail()->update([
             'heading' => $this->heading,
@@ -139,15 +124,12 @@ new #[Title('About')] class extends Component {
             'subtitle' => $this->subtitle,
             'paragraph1' => $this->paragraph1,
             'paragraph2' => $this->paragraph2,
-            'profile_image' => $this->profileImage,
-            'signature_image' => $this->signatureImage,
+            'profile_image' => $this->profileImagePath,
+            'signature_image' => $this->signatureImagePath,
             'signature_name' => $this->signatureName,
             'signature_title' => $this->signatureTitle,
             'info_items' => $this->infoItems,
         ]);
-
-        $this->profileImageFile = null;
-        $this->signatureImageFile = null;
 
         Flux::toast(
             heading: 'About section saved',
@@ -293,105 +275,117 @@ new #[Title('About')] class extends Component {
             </flux:field>
         </div>
 
+        @php $cdnUrl = config('filesystems.disks.cdn.url'); @endphp
+
+        {{-- Profile Image --}}
         <div>
             <flux:heading level="3" size="lg">{{ __('Profile Image') }}</flux:heading>
             <flux:text class="mt-1 mb-4">{{ __('Upload a profile image for the about section.') }}</flux:text>
 
-            <div class="flex items-center gap-6">
+            <div class="flex items-center gap-6" x-data>
                 <div class="shrink-0">
                     <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
-                        @if ($profileImageFile)
-                            <img src="{{ $profileImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
-                        @elseif ($profileImage && !str_starts_with($profileImage, 'asset/'))
-                            <img src="{{ Storage::url($profileImage) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current profile image') }}">
-                        @else
-                            <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
-                        @endif
+                        <img src="{{ $profileImagePath && !str_starts_with($profileImagePath, 'asset/') ? $cdnUrl . '/' . ltrim($profileImagePath, '/') : asset($profileImagePath && str_starts_with($profileImagePath, 'asset/') ? $profileImagePath : 'asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}" id="about-profile-preview">
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <input
                         type="file"
-                        wire:model="profileImageFile"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        accept="image/*"
                         class="hidden"
                         x-ref="profileImageInput"
+                        @change="
+                            const file = $event.target.files[0];
+                            if (!file) return;
+                            const status = $el.closest('.flex').querySelector('.profile-status');
+                            status.textContent = 'Processing...';
+                            window.cdnUploader.fullPipeline(
+                                file, 'about',
+                                () => $wire.generatePresignedUrl('profileImagePath'),
+                                (path) => $wire.set('profileImagePath', path)
+                            ).then((path) => {
+                                status.textContent = 'Upload complete';
+                                document.getElementById('about-profile-preview').src = '{{ $cdnUrl }}/' + (path.charAt(0) === '/' ? path.slice(1) : path);
+                            }).catch((err) => {
+                                status.textContent = 'Upload failed: ' + err.message;
+                            });
+                        "
                     />
 
                     <div class="flex items-center gap-2">
                         <flux:button type="button" variant="primary" x-on:click="$refs.profileImageInput.click()">
                             {{ __('Upload Image') }}
                         </flux:button>
-
-                        @if ($profileImageFile)
-                            <flux:button type="button" variant="ghost" wire:click="removeProfileImage" wire:loading.attr="disabled">
-                                {{ __('Remove Image') }}
-                            </flux:button>
-                        @endif
                     </div>
 
                     <div class="flex items-center gap-2 text-sm text-zinc-500">
-                        @if ($profileImageFile)
-                            <span>{{ $profileImageFile->getClientOriginalName() }}</span>
-                        @elseif ($profileImage)
-                            <span>{{ __('Current image loaded') }}</span>
-                        @else
-                            <span>{{ __('No file selected') }}</span>
-                        @endif
-                        <span wire:loading wire:target="profileImageFile">{{ __('Uploading...') }}</span>
+                        <span class="profile-status">
+                            @if ($profileImagePath && !str_starts_with($profileImagePath, 'asset/'))
+                                {{ __('CDN image loaded') }}
+                            @elseif ($profileImagePath)
+                                {{ __('Current image loaded') }}
+                            @else
+                                {{ __('No file selected') }}
+                            @endif
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
 
+        {{-- Signature Image --}}
         <div>
             <flux:heading level="3" size="lg">{{ __('Signature Image') }}</flux:heading>
             <flux:text class="mt-1 mb-4">{{ __('Upload a signature image for the about section.') }}</flux:text>
 
-            <div class="flex items-center gap-6">
+            <div class="flex items-center gap-6" x-data>
                 <div class="shrink-0">
                     <div style="width:150px;height:150px;overflow:hidden;border-radius:7px;flex:0 0 150px;">
-                        @if ($signatureImageFile)
-                            <img src="{{ $signatureImageFile->temporaryUrl() }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}">
-                        @elseif ($signatureImage && !str_starts_with($signatureImage, 'asset/'))
-                            <img src="{{ Storage::url($signatureImage) }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Current signature image') }}">
-                        @else
-                            <img src="{{ asset('asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('No image selected') }}">
-                        @endif
+                        <img src="{{ $signatureImagePath && !str_starts_with($signatureImagePath, 'asset/') ? $cdnUrl . '/' . ltrim($signatureImagePath, '/') : asset($signatureImagePath && str_starts_with($signatureImagePath, 'asset/') ? $signatureImagePath : 'asset/img/preview-images-kosong.png') }}" style="width:100%;height:100%;object-fit:cover;display:block;" alt="{{ __('Preview') }}" id="about-signature-preview">
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-2">
                     <input
                         type="file"
-                        wire:model="signatureImageFile"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        accept="image/*"
                         class="hidden"
                         x-ref="signatureImageInput"
+                        @change="
+                            const file = $event.target.files[0];
+                            if (!file) return;
+                            const status = $el.closest('.flex').querySelector('.signature-status');
+                            status.textContent = 'Processing...';
+                            window.cdnUploader.fullPipeline(
+                                file, 'about',
+                                () => $wire.generatePresignedUrl('signatureImagePath'),
+                                (path) => $wire.set('signatureImagePath', path)
+                            ).then((path) => {
+                                status.textContent = 'Upload complete';
+                                document.getElementById('about-signature-preview').src = '{{ $cdnUrl }}/' + (path.charAt(0) === '/' ? path.slice(1) : path);
+                            }).catch((err) => {
+                                status.textContent = 'Upload failed: ' + err.message;
+                            });
+                        "
                     />
 
                     <div class="flex items-center gap-2">
                         <flux:button type="button" variant="primary" x-on:click="$refs.signatureImageInput.click()">
                             {{ __('Upload Image') }}
                         </flux:button>
-
-                        @if ($signatureImageFile)
-                            <flux:button type="button" variant="ghost" wire:click="removeSignatureImage" wire:loading.attr="disabled">
-                                {{ __('Remove Image') }}
-                            </flux:button>
-                        @endif
                     </div>
 
                     <div class="flex items-center gap-2 text-sm text-zinc-500">
-                        @if ($signatureImageFile)
-                            <span>{{ $signatureImageFile->getClientOriginalName() }}</span>
-                        @elseif ($signatureImage)
-                            <span>{{ __('Current image loaded') }}</span>
-                        @else
-                            <span>{{ __('No file selected') }}</span>
-                        @endif
-                        <span wire:loading wire:target="signatureImageFile">{{ __('Uploading...') }}</span>
+                        <span class="signature-status">
+                            @if ($signatureImagePath && !str_starts_with($signatureImagePath, 'asset/'))
+                                {{ __('CDN image loaded') }}
+                            @elseif ($signatureImagePath)
+                                {{ __('Current image loaded') }}
+                            @else
+                                {{ __('No file selected') }}
+                            @endif
+                        </span>
                     </div>
                 </div>
             </div>
@@ -499,7 +493,7 @@ new #[Title('About')] class extends Component {
         @endif
     </div>
 
-    {{-- ==================== SKILL FORM MODAL ==================== --}}
+    {{-- Skill Form Modal --}}
     <flux:modal name="skill-form" class="min-w-[28rem]">
         <div class="space-y-6">
             <div>
@@ -538,7 +532,7 @@ new #[Title('About')] class extends Component {
         </div>
     </flux:modal>
 
-    {{-- ==================== DELETE SKILL CONFIRM MODAL ==================== --}}
+    {{-- Delete Skill Confirm Modal --}}
     <flux:modal name="delete-skill-confirm" class="min-w-[24rem]">
         <div class="space-y-6">
             <div>
